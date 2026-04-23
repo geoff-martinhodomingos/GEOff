@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CEBMS GEOff - V23 Unified</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#eef2f3;
+}
+
+/* TOPBAR */
+.topbar{
+display:flex;
+align-items:center;
+gap:10px;
+padding:12px;
+background:#1a73e8;
+color:white;
+}
+
+.hamburger{
+font-size:22px;
+background:none;
+border:none;
+color:white;
+cursor:pointer;
+}
+
+/* SIDEBAR */
+.sidebar{
+position:fixed;
+top:0;
+left:0;
+width:240px;
+height:100%;
+background:white;
+box-shadow:2px 0 10px rgba(0,0,0,0.2);
+padding:15px;
+display:flex;
+flex-direction:column;
+gap:10px;
+z-index:1000;
+}
+
+.sidebar button{
+padding:10px;
+border:none;
+border-radius:8px;
+background:#f1f1f1;
+cursor:pointer;
+text-align:left;
+}
+
+.sidebar button:hover{
+background:#ddd;
+}
+
+.overlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+z-index:999;
+}
+
+/* APP */
+.app{
+padding:15px;
+}
+
+.card{
+background:white;
+padding:15px;
+border-radius:10px;
+margin-top:10px;
+}
+
+/* FORM */
+input,select{
+padding:8px;
+margin:5px 0;
+width:100%;
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+.btn{
+background:#1a73e8;
+color:white;
+}
+
+.hidden{display:none;}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:6px;
+text-align:center;
+}
+
+th{background:#1a73e8;color:white;}
+</style>
+</head>
+
+<body>
+
+<!-- TOP -->
+<div class="topbar">
+<button class="hamburger" onclick="toggleMenu()">☰</button>
+<h3>CEBMS GEOff</h3>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar" class="sidebar hidden">
+<button onclick="abrir('turmas')">🏫 Turmas</button>
+<button onclick="abrir('alunos')">🎓 Alunos</button>
+<button onclick="abrir('notas')">📊 Notas</button>
+<button onclick="abrir('usuarios')">👥 Utilizadores</button>
+<button onclick="logout()">🚪 Sair</button>
+</div>
+
+<div id="overlay" class="overlay hidden" onclick="toggleMenu()"></div>
+
+<!-- APP -->
+<div class="app">
+
+<!-- LOGIN -->
+<div id="login">
+<h3>Login</h3>
+<input id="user" placeholder="Utilizador">
+<input id="pass" type="password" placeholder="Senha">
+<button class="btn" onclick="login()">Entrar</button>
+</div>
+
+<!-- TURMAS -->
+<div id="turmas" class="hidden card">
+<h3>Turmas</h3>
+<input id="t_nome">
+<button class="btn" onclick="addTurma()">Adicionar</button>
+<div id="list_t"></div>
+<button onclick="voltar()">Voltar</button>
+</div>
+
+<!-- ALUNOS -->
+<div id="alunos" class="hidden card">
+<h3>Alunos</h3>
+<input id="a_nome">
+<select id="a_turma"></select>
+<button class="btn" onclick="addAluno()">Adicionar</button>
+<div id="list_a"></div>
+<button onclick="voltar()">Voltar</button>
+</div>
+
+<!-- NOTAS -->
+<div id="notas" class="hidden card">
+<h3>Notas</h3>
+<select id="sel_turma" onchange="renderNotas()"></select>
+<div id="cont_notas"></div>
+<button onclick="voltar()">Voltar</button>
+</div>
+
+<!-- USERS -->
+<div id="usuarios" class="hidden card">
+<h3>Utilizadores</h3>
+
+<input id="u_user">
+<input id="u_pass">
+
+<select id="u_nivel" onchange="toggleTurma()">
+<option value="admin">Admin</option>
+<option value="professor">Professor</option>
+</select>
+
+<select id="u_turma" class="hidden"></select>
+
+<button class="btn" onclick="addUser()">Criar</button>
+
+<div id="list_u"></div>
+
+<button onclick="voltar()">Voltar</button>
+</div>
+
+</div>
+
+<script>
+
+// DB
+let db=JSON.parse(localStorage.getItem('cebms_v23'))||{
+turmas:[],
+alunos:[],
+notas:[],
+usuarios:[
+{user:"admin",pass:"1234",nivel:"admin"},
+{user:"prof1",pass:"1234",nivel:"professor",turma:"7ª A"}
+]
+};
+
+const save=()=>localStorage.setItem('cebms_v23',JSON.stringify(db));
+
+let userLog=null;
+
+/* MENU */
+function toggleMenu(){
+sidebar.classList.toggle("hidden");
+overlay.classList.toggle("hidden");
+}
+
+/* LOGIN */
+function login(){
+let u=user.value,p=pass.value;
+let f=db.usuarios.find(x=>x.user===u&&x.pass===p);
+
+if(f){
+userLog=f;
+login.classList.add('hidden');
+abrir('menu');
+}else alert("Erro login");
+}
+
+function logout(){location.reload();}
+
+/* NAV */
+function abrir(id){
+
+toggleMenu();
+
+document.querySelectorAll('.app > div').forEach(d=>d.classList.add('hidden'));
+
+if(id==='menu'){
+login.classList.add('hidden');
+return;
+}
+
+document.getElementById(id).classList.remove('hidden');
+
+if(id==='alunos'){
+a_turma.innerHTML=db.turmas
+.filter(t=>userLog.nivel==="admin"||t===userLog.turma)
+.map(t=>`<option>${t}</option>`);
+listAlunos();
+}
+
+if(id==='notas'){
+sel_turma.innerHTML=db.turmas
+.filter(t=>userLog.nivel==="admin"||t===userLog.turma)
+.map(t=>`<option>${t}</option>`);
+}
+
+if(id==='usuarios') listUsers();
+if(id==='turmas') listTurmas();
+}
+
+function voltar(){
+document.querySelectorAll('.app > div').forEach(d=>d.classList.add('hidden'));
+login.classList.add('hidden');
+}
+
+/* TURMAS */
+function addTurma(){
+db.turmas.push(t_nome.value);
+save(); listTurmas();
+}
+
+function listTurmas(){
+list_t.innerHTML=db.turmas.map(t=>`<p>${t}</p>`).join('');
+}
+
+/* ALUNOS */
+function addAluno(){
+db.alunos.push({nome:a_nome.value,turma:a_turma.value});
+save(); listAlunos();
+}
+
+function listAlunos(){
+let a=db.alunos;
+if(userLog.nivel==="professor"){
+a=a.filter(x=>x.turma===userLog.turma);
+}
+list_a.innerHTML="<table><tr><th>Nome</th><th>Turma</th></tr>"+
+a.map(x=>`<tr><td>${x.nome}</td><td>${x.turma}</td></tr>`).join("")+"</table>";
+}
+
+/* NOTAS */
+function renderNotas(){
+let t=sel_turma.value;
+
+if(userLog.nivel==="professor"&&t!==userLog.turma)return;
+
+let a=db.alunos.filter(x=>x.turma===t);
+
+cont_notas.innerHTML="<table><tr><th>Aluno</th><th>Nota</th></tr>"+
+a.map(x=>{
+let id=x.nome+"_"+t;
+let v=db.notas.find(n=>n.id===id)?.v||"";
+return `<tr><td>${x.nome}</td>
+<td><input value="${v}" onchange="save('${id}',this.value)"></td></tr>`;
+}).join("")+"</table>";
+}
+
+function save(id,v){
+let i=db.notas.findIndex(n=>n.id===id);
+if(i>-1)db.notas[i].v=v;
+else db.notas.push({id,v});
+save();
+}
+
+/* USERS */
+function toggleTurma(){
+if(u_nivel.value==="professor"){
+u_turma.classList.remove('hidden');
+u_turma.innerHTML=db.turmas.map(t=>`<option>${t}</option>`);
+}else u_turma.classList.add('hidden');
+}
+
+function addUser(){
+db.usuarios.push({
+user:u_user.value,
+pass:u_pass.value,
+nivel:u_nivel.value,
+turma:u_turma.value
+});
+save(); listUsers();
+}
+
+function listUsers(){
+list_u.innerHTML="<table><tr><th>User</th><th>Nível</th><th>Turma</th></tr>"+
+db.usuarios.map(u=>`<tr><td>${u.user}</td><td>${u.nivel}</td><td>${u.turma||'-'}</td></tr>`).join("")+"</table>";
+}
+
+</script>
+
+</body>
+</html>
